@@ -1,6 +1,6 @@
 
-import { json, redirect, LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
-import { useLoaderData, useSubmit, useActionData, useNavigate } from "@remix-run/react";
+import { json, type LoaderFunctionArgs, type ActionFunctionArgs } from "@remix-run/node";
+import { useLoaderData, useSubmit, useNavigate, useNavigation, useRouteError } from "@remix-run/react";
 import {
     Page,
     Layout,
@@ -12,6 +12,8 @@ import {
     Button,
     Grid,
     TextField,
+    Banner,
+    Box,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -21,54 +23,64 @@ interface ProductNode {
     id: string;
     title: string;
     featuredImage?: { url: string };
-    totalVariants: number;
     handle: string;
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+    console.log("loader hit for id:", params.id);
     const { admin, session } = await authenticate.admin(request);
+
+    // 1. Fetch Video
     const video = await prisma.video.findUnique({
         where: { id: params.id, shop: session.shop },
         include: { products: true }
     });
 
     if (!video) {
-        throw new Response("Not Found", { status: 404 });
+        console.error("Video not found in DB");
+        throw new Response("Video Not Found", { status: 404 });
     }
 
-    // Fetch product details for the tags
+    // 2. Fetch Tagged Product Details
     const productIds = video.products.map(p => p.productId);
-    let productsMap: Record<string, ProductNode> = {};
+    let taggedProductsMap: Record<string, ProductNode> = {};
 
     if (productIds.length > 0) {
-        const response = await admin.graphql(
-            `query getProducts($ids: [ID!]!) {
-            nodes(ids: $ids) {
-                ... on Product {
-                    id
-                    title
-                    featuredImage {
-                        url
+        try {
+            const response = await admin.graphql(
+                `query getProducts($ids: [ID!]!) {
+                    nodes(ids: $ids) {
+                        ... on Product {
+                            id
+                            title
+                            featuredImage {
+                                url
+                            }
+                            handle
+                        }
                     }
-                    totalVariants
-                    handle
-                }
-            }
-        }`,
-            { variables: { ids: productIds } }
-        );
+                }`,
+                { variables: { ids: productIds } }
+            );
 
-        const responseJson = await response.json();
-        const data = responseJson.data;
-
-        if (data?.nodes) {
-            data.nodes.forEach((node: any) => {
-                if (node) productsMap[node.id] = node;
+            const responseJson = await response.json();
+            const nodes = responseJson.data?.nodes || [];
+            nodes.forEach((node: any) => {
+                if (node) taggedProductsMap[node.id] = node;
             });
+        } catch (e) {
+            console.error("GraphQL error fetching products:", e);
         }
     }
 
-    return json({ video, productsMap });
+    const host = new URL(request.url).searchParams.get("host");
+
+    return json({
+        video,
+        taggedProductsMap,
+        shop: session.shop,
+        host
+    });
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
@@ -77,76 +89,92 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const intent = formData.get("intent");
 
     if (intent === "tag_product") {
-        const productsJson = formData.get("products") as string;
-        const products = JSON.parse(productsJson);
+        const productId = formData.get("productId") as string;
+        const handle = formData.get("handle") as string;
+        const variantId = formData.get("variantId") as string;
 
-        for (const p of products) {
-            const exists = await prisma.productTag.findFirst({
-                where: { videoId: params.id, productId: p.id }
+        const exists = await prisma.productTag.findFirst({
+            where: { videoId: params.id, productId }
+        });
+
+        if (!exists) {
+            await prisma.productTag.create({
+                data: {
+                    videoId: params.id!,
+                    productId,
+                    handle: handle || "",
+                    variantId: variantId || ""
+                }
             });
-            if (!exists) {
-                await prisma.productTag.create({
-                    data: {
-                        videoId: params.id!,
-                        productId: p.id,
-                        handle: p.handle,
-                        variantId: p.variants?.[0]?.id
-                    }
-                });
-            }
         }
-        return json({ status: "success" });
-    }
-
-    if (intent === "remove_tag") {
+    } else if (intent === "remove_tag") {
         const tagId = formData.get("tagId") as string;
         await prisma.productTag.deleteMany({
             where: { id: tagId, videoId: params.id }
         });
-        return json({ status: "removed" });
+    } else {
+        const title = formData.get("title") as string;
+        const group = formData.get("group") as string;
+        await prisma.video.update({
+            where: { id: params.id, shop: session.shop },
+            data: { title, group }
+        });
     }
 
-    // Handle update video metadata
-    const title = formData.get("title") as string;
-    const group = formData.get("group") as string;
-
-    await prisma.video.update({
-        where: { id: params.id, shop: session.shop },
-        data: { title, group }
-    });
-
-    return json({ status: "updated" });
+    return json({ success: true });
 };
 
 export default function VideoDetail() {
-    const { video, productsMap } = useLoaderData<typeof loader>();
+    const { video, taggedProductsMap, shop, host } = useLoaderData<typeof loader>();
     const submit = useSubmit();
+    const navigate = useNavigate();
+    const navigation = useNavigation();
+
     const [title, setTitle] = useState(video.title || "");
     const [group, setGroup] = useState(video.group || "all");
 
+    const isLoading = navigation.state !== "idle";
+
+    const searchParams = new URLSearchParams();
+    if (shop) searchParams.set("shop", shop);
+    if (host) searchParams.set("host", host);
+    const queryString = searchParams.toString() ? `?${searchParams.toString()}` : "";
+
     const handleSave = () => {
         const formData = new FormData();
-        formData.append("intent", "update_meta");
         formData.append("title", title);
         formData.append("group", group);
         submit(formData, { method: "post" });
     };
 
-    const selectProduct = async () => {
-        const selected = await window.shopify.resourcePicker({ type: "product", multiple: true });
-        if (selected) {
-            const formData = new FormData();
-            formData.append("intent", "tag_product");
-            formData.append("products", JSON.stringify(selected));
-            submit(formData, { method: "post" });
+    const openResourcePicker = async () => {
+        try {
+            const selected = await window.shopify.resourcePicker({
+                type: "product",
+                multiple: true,
+            });
+
+            if (selected && selected.selection.length > 0) {
+                // Submit each selected product
+                for (const product of selected.selection) {
+                    const formData = new FormData();
+                    formData.append("intent", "tag_product");
+                    formData.append("productId", product.id);
+                    formData.append("handle", product.handle);
+                    formData.append("variantId", product.variants?.[0]?.id || "");
+                    submit(formData, { method: "post" });
+                }
+            }
+        } catch (e) {
+            console.error("Resource picker error:", e);
         }
     };
 
     return (
         <Page
-            breadcrumbs={[{ content: "Videos", url: "/app/videos" }]}
+            backAction={{ content: "Videos", url: `/app/videos${queryString}` }}
             title={video.title || "Video Detail"}
-            primaryAction={{ content: "Save", onAction: handleSave }}
+            primaryAction={{ content: "Save", onAction: handleSave, loading: isLoading }}
         >
             <Layout>
                 <Layout.Section>
@@ -155,7 +183,7 @@ export default function VideoDetail() {
                             <Card>
                                 <BlockStack gap="400">
                                     <Text variant="headingMd" as="h2">Video Preview</Text>
-                                    <div style={{ aspectRatio: '9/16', backgroundColor: '#000', maxWidth: '300px', margin: '0 auto' }}>
+                                    <div style={{ aspectRatio: '9/16', backgroundColor: '#000', maxWidth: '300px', margin: '0 auto', borderRadius: '8px', overflow: 'hidden' }}>
                                         <video
                                             src={video.url}
                                             poster={video.thumbnail || undefined}
@@ -163,55 +191,42 @@ export default function VideoDetail() {
                                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                         />
                                     </div>
-                                    <TextField
-                                        label="Title"
-                                        value={title}
-                                        onChange={setTitle}
-                                        autoComplete="off"
-                                    />
-                                    <TextField
-                                        label="Group (Page Targeting)"
-                                        value={group}
-                                        onChange={setGroup}
-                                        autoComplete="off"
-                                        helpText="e.g., 'home', 'product-page'"
-                                    />
+                                    <TextField label="Title" value={title} onChange={setTitle} autoComplete="off" />
+                                    <TextField label="Group" value={group} onChange={setGroup} autoComplete="off" helpText="Page targeting like 'home' or 'product'" />
                                 </BlockStack>
                             </Card>
                         </Grid.Cell>
+
                         <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 4, xl: 4 }}>
                             <Card>
                                 <BlockStack gap="400">
                                     <InlineStack align="space-between">
-                                        <Text variant="headingMd" as="h2">Tagged Products</Text>
-                                        <Button onClick={selectProduct}>Tag Product</Button>
+                                        <Text variant="headingMd" as="h2">Products</Text>
+                                        <Button variant="primary" onClick={openResourcePicker}>
+                                            Tag Product
+                                        </Button>
                                     </InlineStack>
 
                                     {video.products.length === 0 ? (
-                                        <Text tone="subdued" as="p">No products tagged yet.</Text>
+                                        <Banner tone="info"><p>Click 'Tag Product' to start</p></Banner>
                                     ) : (
                                         <BlockStack gap="200">
                                             {video.products.map((tag: any) => {
-                                                const product = productsMap[tag.productId];
+                                                const product = taggedProductsMap[tag.productId];
                                                 return (
-                                                    <InlineStack key={tag.id} gap="300" align="start" blockAlign="center">
-                                                        <Thumbnail
-                                                            source={product?.featuredImage?.url || ""}
-                                                            alt={product?.title || "Product"}
-                                                        />
-                                                        <div style={{ flex: 1 }}>
-                                                            <Text variant="bodyMd" fontWeight="bold" as="p">
-                                                                {product ? product.title : "Loading..."}
-                                                            </Text>
-                                                        </div>
-                                                        <Button
-                                                            tone="critical"
-                                                            variant="plain"
-                                                            onClick={() => submit({ intent: 'remove_tag', tagId: tag.id }, { method: 'post' })}
-                                                        >
-                                                            Remove
-                                                        </Button>
-                                                    </InlineStack>
+                                                    <Box key={tag.id} padding="300" background="bg-surface-secondary" borderRadius="200">
+                                                        <InlineStack gap="300" align="start" blockAlign="center">
+                                                            <Thumbnail
+                                                                source={product?.featuredImage?.url || "https://cdn.shopify.com/s/files/1/0533/2089/files/placeholder-images-image_large.png"}
+                                                                alt={product?.title || "Product"}
+                                                                size="small"
+                                                            />
+                                                            <div style={{ flex: 1 }}><Text variant="bodyMd" fontWeight="bold" as="p">{product?.title || "Loading..."}</Text></div>
+                                                            <Button tone="critical" variant="plain" onClick={() => submit({ intent: 'remove_tag', tagId: tag.id }, { method: 'post' })}>
+                                                                Remove
+                                                            </Button>
+                                                        </InlineStack>
+                                                    </Box>
                                                 );
                                             })}
                                         </BlockStack>
@@ -224,4 +239,27 @@ export default function VideoDetail() {
             </Layout>
         </Page>
     );
+}
+
+export function ErrorBoundary() {
+    const error: any = useRouteError();
+    return (
+        <Page title="Loading Error">
+            <Card>
+                <Banner tone="critical">
+                    <Text as="h2">Could not load video detail</Text>
+                    <p>{error?.message || "Verify the video exists and try again."}</p>
+                    <Button url="/app/videos">Back to Library</Button>
+                </Banner>
+            </Card>
+        </Page>
+    );
+}
+
+declare global {
+    interface Window {
+        shopify: {
+            resourcePicker: (options: any) => Promise<any>;
+        };
+    }
 }

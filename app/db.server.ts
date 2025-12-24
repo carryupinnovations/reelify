@@ -1,3 +1,4 @@
+// Database client initialization (updated for ABS)
 import { PrismaClient } from "@prisma/client";
 
 declare global {

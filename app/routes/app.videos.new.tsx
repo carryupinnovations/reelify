@@ -1,6 +1,5 @@
-
-import { json, redirect } from "@remix-run/node";
-import { useActionData, useSubmit, useNavigate, Form } from "@remix-run/react";
+import { json, redirect, type ActionFunctionArgs } from "@remix-run/node";
+import { Form, useActionData, useNavigate } from "@remix-run/react";
 import {
     Page,
     Layout,
@@ -16,8 +15,9 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { useState } from "react";
 
-export const action = async ({ request }) => {
-    const { admin, session } = await authenticate.admin(request);
+export const action = async ({ request }: ActionFunctionArgs) => {
+    console.log("=== VIDEO CREATE ACTION CALLED ===");
+    const { session } = await authenticate.admin(request);
     const formData = await request.formData();
 
     const title = formData.get("title") as string;
@@ -25,28 +25,29 @@ export const action = async ({ request }) => {
     const url = formData.get("url") as string;
     const thumbnail = formData.get("thumbnail") as string;
 
+    console.log("Form data received:", { title, group, url, thumbnail, shop: session.shop });
+
     if (!url) {
+        console.log("Validation failed: URL is required");
         return json({ errors: { url: "URL is required" } }, { status: 400 });
     }
 
-    const shop = session.shop;
-
     const video = await prisma.video.create({
         data: {
-            title,
+            title: title || "Untitled",
             group,
             url,
-            thumbnail,
-            shop
+            thumbnail: thumbnail || "",
+            shop: session.shop
         }
     });
 
-    return redirect(`/app/videos/${video.id}`);
+    console.log("Video created successfully:", video.id);
+    return redirect(`/app/videos`);
 };
 
 export default function NewVideo() {
-    const actionData = useActionData();
-    const submit = useSubmit();
+    const actionData = useActionData<typeof action>();
     const navigate = useNavigate();
 
     const [title, setTitle] = useState("");
@@ -59,19 +60,26 @@ export default function NewVideo() {
         const file = event.target.files?.[0];
         if (!file) return;
 
+        console.log("=== FILE UPLOAD STARTED ===");
+        console.log("File:", file.name, file.type, file.size);
         setUploading(true);
-        // 1. Get presigned URL
+
         try {
-            const res = await fetch(`/api/sign-s3?filename=${encodeURIComponent(file.name)}&filetype=${encodeURIComponent(file.type)}`);
+            const apiUrl = `/api/sign-s3?filename=${encodeURIComponent(file.name)}&filetype=${encodeURIComponent(file.type)}`;
+            console.log("Requesting presigned URL from:", apiUrl);
+
+            const res = await fetch(apiUrl);
             const data = await res.json();
+            console.log("Presigned URL response:", data);
 
             if (data.error) {
-                alert(`Error signing: ${data.error}`);
+                console.error("Error from sign-s3 API:", data.error);
+                alert(`Error: ${data.error}`);
                 setUploading(false);
                 return;
             }
 
-            // 2. Upload to S3
+            console.log("Uploading file to S3...");
             const uploadRes = await fetch(data.signedUrl, {
                 method: "PUT",
                 body: file,
@@ -80,89 +88,125 @@ export default function NewVideo() {
                 }
             });
 
+            console.log("S3 upload response status:", uploadRes.status);
             if (uploadRes.ok) {
+                console.log("✅ Upload successful! URL:", data.publicUrl);
                 setUrl(data.publicUrl);
-                // Try to set thumbnail automatically if possible? Or just url.
+                alert("Video uploaded successfully to S3!");
             } else {
-                alert("Upload failed");
-                console.error("Upload failed", uploadRes);
+                const errorText = await uploadRes.text();
+                console.error("S3 upload failed:", uploadRes.status, errorText);
+                alert("Upload failed. Check console for details.");
             }
         } catch (e) {
-            console.error("Upload error", e);
-            alert("Upload error");
+            console.error("Upload error:", e);
+            alert("Upload error: " + e);
         } finally {
             setUploading(false);
+            console.log("=== FILE UPLOAD ENDED ===");
         }
-    };
-
-    const handleSubmit = () => {
-        const formData = new FormData();
-        formData.append("title", title);
-        formData.append("group", group);
-        formData.append("url", url);
-        formData.append("thumbnail", thumbnail);
-        submit(formData, { method: "post" });
     };
 
     return (
         <Page
-            breadcrumbs={[{ content: "Videos", url: "/app/videos" }]}
+            backAction={{ content: "Videos", onAction: () => navigate('/app/videos') }}
             title="Add New Video"
         >
             <Layout>
                 <Layout.Section>
-                    <Card>
-                        <BlockStack gap="500">
-                            {actionData?.errors && (
-                                <Banner tone="critical">
-                                    <p>{actionData.errors.url}</p>
-                                </Banner>
-                            )}
-                            <FormLayout>
-                                <TextField
-                                    label="Title"
-                                    value={title}
-                                    onChange={setTitle}
-                                    autoComplete="off"
-                                    placeholder="Summer Collection Showcase"
-                                />
-                                <TextField
-                                    label="Video Group (Page Targeting)"
-                                    value={group}
-                                    onChange={setGroup}
-                                    autoComplete="off"
-                                    placeholder="home, product-page, etc."
-                                    helpText="Use this to filter which videos appear on specific pages."
-                                />
+                    <Form method="post">
+                        <Card>
+                            <BlockStack gap="500">
+                                {actionData?.errors && (
+                                    <Banner tone="critical">
+                                        <p>{actionData.errors.url}</p>
+                                    </Banner>
+                                )}
 
-                                <div style={{ border: '1px dashed #ccc', padding: '20px', borderRadius: '8px' }}>
-                                    <BlockStack gap="200">
-                                        <Text variant="headingSm" as="h3">Upload Video</Text>
-                                        <input type="file" accept="video/mp4" onChange={handleFileChange} disabled={uploading} />
-                                        {uploading && <Text as="p">Uploading... please wait.</Text>}
-                                    </BlockStack>
-                                </div>
+                                <FormLayout>
+                                    <TextField
+                                        label="Title"
+                                        name="title"
+                                        value={title}
+                                        onChange={setTitle}
+                                        autoComplete="off"
+                                        placeholder="Summer Collection Showcase"
+                                    />
 
-                                <TextField
-                                    label="Video URL (MP4)"
-                                    value={url}
-                                    onChange={setUrl}
-                                    autoComplete="off"
-                                    placeholder="https://cdn.shopify.com/..."
-                                    helpText="Direct link to an MP4 file (or upload above)."
-                                    error={actionData?.errors?.url}
-                                />
-                                <TextField
-                                    label="Thumbnail URL"
-                                    value={thumbnail}
-                                    onChange={setThumbnail}
-                                    autoComplete="off"
-                                    placeholder="https://example.com/thumb.jpg"
-                                />
-                                <Button submit onClick={handleSubmit} variant="primary" disabled={uploading}>Create Video</Button>
-                            </FormLayout>
-                        </BlockStack>
-                    </Card>
+                                    <TextField
+                                        label="Video Group (Page Targeting)"
+                                        name="group"
+                                        value={group}
+                                        onChange={setGroup}
+                                        autoComplete="off"
+                                        placeholder="home, product-page, etc."
+                                        helpText="Use this to filter which videos appear on specific pages."
+                                    />
+
+                                    <div style={{
+                                        border: '2px dashed #E1E3E5',
+                                        padding: '20px',
+                                        borderRadius: '8px',
+                                        backgroundColor: '#F6F6F7'
+                                    }}>
+                                        <BlockStack gap="300">
+                                            <Text variant="headingSm" as="h3">Upload Video to AWS S3</Text>
+                                            <input
+                                                type="file"
+                                                accept="video/*"
+                                                onChange={handleFileChange}
+                                                disabled={uploading}
+                                                style={{
+                                                    padding: '10px',
+                                                    width: '100%',
+                                                    fontSize: '14px'
+                                                }}
+                                            />
+                                            {uploading && (
+                                                <Banner tone="info">
+                                                    <p>Uploading to S3... please wait.</p>
+                                                </Banner>
+                                            )}
+                                            {url && (
+                                                <Banner tone="success">
+                                                    <p>✅ Video uploaded! URL has been set.</p>
+                                                </Banner>
+                                            )}
+                                        </BlockStack>
+                                    </div>
+
+                                    <TextField
+                                        label="Video URL (MP4)"
+                                        name="url"
+                                        value={url}
+                                        onChange={setUrl}
+                                        autoComplete="off"
+                                        placeholder="https://s3.amazonaws.com/..."
+                                        helpText="Upload a file above or paste a direct video URL"
+                                        error={actionData?.errors?.url}
+                                    />
+
+                                    <TextField
+                                        label="Thumbnail URL (Optional)"
+                                        name="thumbnail"
+                                        value={thumbnail}
+                                        onChange={setThumbnail}
+                                        autoComplete="off"
+                                        placeholder="https://example.com/thumb.jpg"
+                                    />
+
+                                    <Button
+                                        submit
+                                        variant="primary"
+                                        disabled={uploading || !url}
+                                        onClick={() => console.log("=== CREATE VIDEO BUTTON CLICKED ===")}
+                                    >
+                                        {uploading ? 'Uploading...' : 'Create Video'}
+                                    </Button>
+                                </FormLayout>
+                            </BlockStack>
+                        </Card>
+                    </Form>
                 </Layout.Section>
             </Layout>
         </Page>

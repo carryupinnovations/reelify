@@ -40,11 +40,13 @@ model Video {
   url       String
   thumbnail String?
   duration  Int?
-  group     String?      @default("all")
-  shop      String
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  products  ProductTag[]
+  group      String?      @default("all")
+  absEnabled Boolean      @default(false)
+  absUrl     String?
+  shop       String
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  products   ProductTag[]
 }
 
 model ProductTag {

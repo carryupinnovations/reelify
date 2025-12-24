@@ -13,14 +13,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     const whereClause: any = { shop };
-    if (group) {
-        // If group is specified, we match exact group OR 'all' OR null (legacy)
+    if (group && group !== "all") {
+        // If specific group is requested (e.g. 'home'), show that group OR 'all' OR untagged
         whereClause.OR = [
             { group: group },
             { group: "all" },
             { group: null }
         ];
     }
+    // If group is 'all' or empty, we fetch everything for this shop (already set in whereClause)
 
     // Fetch videos for this shop
     const videos = await prisma.video.findMany({

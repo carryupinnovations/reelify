@@ -1,315 +1,453 @@
 
-<div class="reelify-widget" data-shop-domain="{{ shop.permanent_domain }}" data-group="{{ block.settings.group }}">
-  <div class="reelify-stories-container">
-    <!-- Skeleton Loader -->
-    <div class="reelify-skeleton-item">
-       <div class="reelify-skeleton-ring"></div>
-       <div class="reelify-skeleton-text"></div>
-    </div>
-    <div class="reelify-skeleton-item">
-       <div class="reelify-skeleton-ring"></div>
-       <div class="reelify-skeleton-text"></div>
-    </div>
-    <div class="reelify-skeleton-item">
-       <div class="reelify-skeleton-ring"></div>
-       <div class="reelify-skeleton-text"></div>
+<div class="reelify-widget" 
+     data-shop-domain="{{ shop.permanent_domain }}" 
+     data-group="{{ block.settings.group }}"
+     style="margin: {{ block.settings.margin_top }}px 0 {{ block.settings.margin_bottom }}px 0;"
+>
+  <div class="reelify-slider-header">
+     <h2 class="reelify-title">{{ block.settings.title }}</h2>
+  </div>
+
+  <div class="reelify-slider-container">
+    <!-- Skeleton Loaders -->
+    <div class="reelify-skeleton">
+      <div class="reelify-skeleton-card"></div>
+      <div class="reelify-skeleton-card"></div>
+      <div class="reelify-skeleton-card"></div>
     </div>
   </div>
 </div>
 
-<div id="reelify-modal" class="reelify-modal">
-  <div class="reelify-modal-content">
-     <span class="reelify-close">&times;</span>
-     <div class="reelify-video-wrapper">
-        <video id="reelify-video-player" controls playsinline></video>
-        <div id="reelify-product-overlay" class="reelify-product-overlay">
-           <!-- Product details here -->
+<!-- IMMERSIVE COMMERCE MODAL -->
+<div id="reelify-shop-modal" class="reelify-shop-modal">
+  <div class="reelify-modal-backdrop"></div>
+  
+  <div class="reelify-modal-view">
+    <!-- CLOSE BUTTON -->
+    <div class="reelify-modal-close-btn">&times;</div>
+
+    <!-- NAVIGATION ARROWS -->
+    <div class="reelify-nav-arrow prev">&lsaquo;</div>
+    <div class="reelify-nav-arrow next">&rsaquo;</div>
+
+    <div class="reelify-modal-content-split">
+      <!-- LEFT: VIDEO PREVIEW -->
+      <div class="reelify-modal-video-box">
+        <video id="reelify-main-player" playsinline loop autoplay muted crossorigin="anonymous"></video>
+        <!-- MOBILE OVERLAY TOGGLE -->
+        <div class="reelify-mobile-info-toggle">Product Info</div>
+      </div>
+
+      <!-- RIGHT: PRODUCT DETAILS -->
+      <div class="reelify-modal-product-sidebar">
+        <div id="reelify-pd-content">
+           <div class="reelify-pd-skeleton">
+              <div class="sk-line large"></div>
+              <div class="sk-line small"></div>
+              <div class="sk-block"></div>
+           </div>
         </div>
-     </div>
+      </div>
+    </div>
   </div>
 </div>
-
-<script>
-(function() {
-  const container = document.querySelector('.reelify-widget');
-  if (!container) return;
-})();
-</script>
 
 {% schema %}
 {
-  "name": "Shoppable Videos",
+  "name": "Immersive Video Slider",
   "target": "section",
   "settings": [
      {
         "type": "text",
+        "id": "title",
+        "label": "Heading",
+        "default": "Shop the Look"
+     },
+     {
+        "type": "text",
         "id": "app_url",
         "label": "App Base URL",
-        "default": "https://your-app-url.com",
-        "info": "Enter the URL where your app is hosted."
+        "default": "https://your-tunnel-url.ngrok-free.app"
      },
      {
         "type": "text",
         "id": "group",
         "label": "Video Group",
-        "default": "all",
-        "info": "Filter videos by group name (e.g. 'home', 'product-page')."
+        "default": "all"
      },
      {
-        "type": "color",
-        "id": "border_color",
-        "label": "Border Color",
-        "default": "#ff0055"
+        "type": "range",
+        "id": "margin_top",
+        "min": 0,
+        "max": 100,
+        "step": 4,
+        "unit": "px",
+        "label": "Margin Top",
+        "default": 40
+     },
+     {
+        "type": "range",
+        "id": "margin_bottom",
+        "min": 0,
+        "max": 100,
+        "step": 4,
+        "unit": "px",
+        "label": "Margin Bottom",
+        "default": 40
      }
   ]
 }
 {% endschema %}
 
 <style>
-  .reelify-stories-container {
-    display: flex;
-    gap: 15px;
-    overflow-x: auto;
-    padding: 20px;
-    scrollbar-width: none;
-  }
-  .reelify-story-item {
-    flex: 0 0 80px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    cursor: pointer;
-    animation: fadeIn 0.5s ease-in;
-  }
-  
-  /* Skeleton */
-  .reelify-skeleton-item {
-      flex: 0 0 80px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-  }
-  .reelify-skeleton-ring {
-      width: 74px;
-      height: 74px;
-      border-radius: 50%;
-      background: #eee;
-      margin-bottom: 5px;
-      animation: pulse 1.5s infinite;
-  }
-  .reelify-skeleton-text {
-      width: 50px;
-      height: 10px;
-      background: #eee;
-      border-radius: 4px;
-      animation: pulse 1.5s infinite;
-  }
-  @keyframes pulse {
-      0% { opacity: 0.6; }
-      50% { opacity: 1; }
-      100% { opacity: 0.6; }
-  }
-  @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
+  :root {
+    --r-primary: #000;
+    --r-accent: #7cfc00;
+    --r-border: rgba(255,255,255,0.1);
+    --r-glass: rgba(255,255,255,0.08);
   }
 
-  .reelify-story-ring {
-    width: 74px;
-    height: 74px;
-    border-radius: 50%;
-    padding: 2px;
-    border: 2px solid {{ block.settings.border_color }};
+  .reelify-widget {
+    max-width: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
-  .reelify-story-image {
+  .reelify-slider-header { padding: 0 20px 20px; }
+  .reelify-title { margin: 0; font-size: 26px; font-weight: 800; color: #111; }
+
+  .reelify-slider-container {
+    display: flex;
+    gap: 18px;
+    overflow-x: auto;
+    padding: 0 20px 25px;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .reelify-slider-container::-webkit-scrollbar { display: none; }
+
+  /* VIDEO CARD */
+  .reelify-v-card {
+    flex: 0 0 280px;
+    height: 480px;
+    background: #000;
+    border-radius: 24px;
+    position: relative;
+    overflow: hidden;
+    scroll-snap-align: start;
+    cursor: pointer;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+    transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+  }
+  .reelify-v-card:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+
+  .reelify-v-card video { width: 100%; height: 100%; object-fit: cover; transition: opacity 0.3s; }
+
+  /* DISCOUNT BADGE */
+  .reelify-discount-badge {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    background: var(--r-accent);
+    color: #000;
+    padding: 6px 12px;
+    border-radius: 30px;
+    font-size: 11px;
+    font-weight: 800;
+    z-index: 5;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    display: none; /* Shown via JS */
+  }
+
+  /* CARD OVERLAY */
+  .reelify-card-footer {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.9));
+    padding: 30px 15px 15px;
+  }
+  .reelify-card-prod-pill {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(15px);
+    padding: 8px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  .reelify-card-p-img { width: 44px; height: 44px; border-radius: 8px; background: #fff; object-fit: cover; }
+  .reelify-card-p-meta { flex: 1; overflow: hidden; color: #fff; }
+  .reelify-card-p-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .reelify-card-p-price { font-size: 12px; font-weight: 500; opacity: 0.9; }
+
+  /* MODAL OVERHAUL */
+  .reelify-shop-modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 999999;
+    align-items: center;
+    justify-content: center;
+  }
+  .reelify-modal-backdrop {
+    position: absolute;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.9);
+    backdrop-filter: blur(15px);
+  }
+  .reelify-modal-view {
+    position: relative;
+    width: 90%;
+    max-width: 1100px;
+    height: 85vh;
+    background: #fff;
+    border-radius: 32px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: r-slideUp 0.5s cubic-bezier(0.165, 0.84, 0.44, 1);
+  }
+  @keyframes r-slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  .reelify-modal-content-split {
+    display: flex;
+    height: 100%;
+    width: 100%;
+  }
+
+  .reelify-modal-video-box {
+    flex: 1.2;
+    background: #000;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .reelify-modal-video-box video {
     width: 100%;
     height: 100%;
-    border-radius: 50%;
     object-fit: cover;
-    border: 2px solid white;
   }
-  .reelify-story-title {
-    font-size: 12px;
-    margin-top: 5px;
-    text-align: center;
-    max-width: 80px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+
+  .reelify-modal-product-sidebar {
+    flex: 0.8;
+    background: #fff;
+    padding: 40px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
   }
-  
-  /* Modal */
-  .reelify-modal {
-      display: none; 
-      position: fixed; 
-      z-index: 9999; 
-      left: 0;
-      top: 0;
-      width: 100%; 
-      height: 100%; 
-      background-color: rgba(0,0,0,0.8); 
+
+  /* MODAL ELEMENTS */
+  .reelify-modal-close-btn {
+    position: absolute; top: 20px; right: 20px;
+    width: 40px; height: 40px;
+    background: #fff; color: #000;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; cursor: pointer; z-index: 100;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   }
-  .reelify-modal-content {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 100%;
-      max-width: 400px;
-      height: 80%;
-      background: #000;
+
+  .reelify-nav-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 50px; height: 50px;
+    background: rgba(255,255,255,0.2);
+    backdrop-filter: blur(10px);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 30px; cursor: pointer;
+    z-index: 100;
+    transition: all 0.3s;
   }
-  .reelify-video-wrapper {
-      position: relative;
-      width: 100%;
-      height: 100%;
+  .reelify-nav-arrow:hover { background: #fff; color: #000; }
+  .reelify-nav-arrow.prev { left: -70px; }
+  .reelify-nav-arrow.next { right: -70px; }
+
+  /* PRODUCT DETAIL STYLING */
+  .r-pd-title { font-size: 28px; font-weight: 800; margin-bottom: 8px; line-height: 1.2; }
+  .r-pd-price-row { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+  .r-pd-price { font-size: 22px; font-weight: 700; color: #000; }
+  .r-pd-compare { text-decoration: line-through; color: #999; font-size: 16px; }
+  .r-pd-desc { font-size: 15px; line-height: 1.6; color: #555; margin-bottom: 30px; }
+  .r-pd-atc {
+    background: #000; color: #fff;
+    width: 100%; padding: 18px; border-radius: 16px;
+    font-size: 16px; font-weight: 700; border: none;
+    cursor: pointer; transition: transform 0.2s;
   }
-  #reelify-video-player {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-  }
-  .reelify-close {
-      position: absolute;
-      top: 10px;
-      right: 20px;
-      color: #fff;
-      font-size: 28px;
-      font-weight: bold;
-      cursor: pointer;
-      z-index: 10001;
-  }
-  .reelify-product-overlay {
-      position: absolute;
-      bottom: 20px;
-      left: 20px;
-      right: 20px;
-      background: white;
-      padding: 10px;
-      border-radius: 8px;
-      display: none; /* Flex when active */
-      align-items: center;
-      gap: 10px;
-  }
-  .reelify-btn-add {
-      background: black;
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 4px;
-      cursor: pointer;
-      margin-left: auto;
+  .r-pd-atc:hover { transform: scale(1.02); }
+
+  @media (max-width: 768px) {
+    .reelify-modal-content-split { flex-direction: column; }
+    .reelify-modal-video-box { flex: 1; }
+    .reelify-modal-product-sidebar { display: none; }
+    .reelify-modal-view { width: 95%; height: 90vh; }
+    .reelify-nav-arrow { display: none; }
   }
 </style>
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    const container = document.querySelector('.reelify-stories-container');
-    const widget = document.querySelector('.reelify-widget'); // Get wrapper to read settings
-    const modal = document.getElementById('reelify-modal');
-    const videoPlayer = document.getElementById('reelify-video-player');
-    const closeBtn = document.querySelector('.reelify-close');
-    const productOverlay = document.getElementById('reelify-product-overlay');
+    const widget = document.querySelector('.reelify-widget');
+    const container = document.querySelector('.reelify-slider-container');
+    const modal = document.getElementById('reelify-shop-modal');
+    const player = document.getElementById('reelify-main-player');
+    const closeBtn = document.querySelector('.reelify-modal-close-btn');
+    const sidebar = document.getElementById('reelify-pd-content');
     
-    if (!widget) return;
+    let currentVideos = [];
+    let currentIndex = 0;
 
-    // Get settings
+    if (!widget || !container) return;
+
     const appUrl = "{{ block.settings.app_url }}";
     const shop = "{{ shop.permanent_domain }}";
-    const group = widget.dataset.group || "";
+    const group = widget.dataset.group || "all";
 
-    if (!appUrl || appUrl.includes("your-app-url")) {
-        console.warn("Reelify: Please configure App URL in Theme Editor");
-        container.innerHTML = "<p>Please configure App URL</p>";
-        return;
-    }
-
-    // Fetch videos
-    const fetchUrl = `${appUrl}/api/videos?shop=${shop}&group=${group}`;
-    
-    fetch(fetchUrl)
+    fetch(`${appUrl}/api/videos?shop=${shop}&group=${group}`)
         .then(res => res.json())
         .then(data => {
             if (data.videos && data.videos.length > 0) {
-                renderStories(data.videos);
+                currentVideos = data.videos;
+                renderReels(data.videos);
             } else {
-                container.innerHTML = "<p style='padding:10px; color:#999'>No videos found for this group.</p>";
+                container.innerHTML = "<p style='padding:40px; color:#666; text-align:center;'>No shoppable videos yet.</p>";
             }
-        })
-        .catch(err => {
-            console.error("Reelify Fetch Error:", err);
-            container.innerHTML = ""; // Hide skeleton on error
         });
 
-    function renderStories(videos) {
-        container.innerHTML = videos.map(video => `
-            <div class="reelify-story-item" data-video='${JSON.stringify(video)}'>
-                <div class="reelify-story-ring">
-                    <img src="${video.thumbnail || ''}" alt="${video.title}" class="reelify-story-image">
+    function renderReels(videos) {
+        container.innerHTML = videos.map((video, idx) => {
+            const firstTag = video.products?.[0];
+            const src = (video.absEnabled && video.absUrl) ? video.absUrl : video.url;
+            return `
+                <div class="reelify-v-card" onclick="openReel(${idx})" data-tag-handle="${firstTag?.handle || ''}">
+                    <div id="badge-${video.id}" class="reelify-discount-badge">SAVE 0%</div>
+                    <video src="${src}" muted playsinline autoplay loop preload="auto" poster="${video.thumbnail || ''}"></video>
+                    ${firstTag ? `
+                        <div class="reelify-card-footer">
+                            <div class="reelify-card-prod-pill" id="pill-${video.id}">
+                                <div class="reelify-card-p-img" style="background:#222"></div>
+                                <div class="reelify-card-p-meta">
+                                    <div class="reelify-card-p-name">Loading...</div>
+                                    <div class="reelify-card-p-price">...</div>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
                 </div>
-                <div class="reelify-story-title">${video.title || 'Video'}</div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
 
-        // Add click listeners
-        document.querySelectorAll('.reelify-story-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const video = JSON.parse(item.dataset.video);
-                openModal(video);
-            });
+        // Fetch product metadata for cards
+        videos.forEach(video => {
+            const tag = video.products?.[0];
+            if (tag?.handle) {
+                fetch(`/products/${tag.handle}.js`).then(r => r.json()).then(p => {
+                    const pill = document.getElementById(`pill-${video.id}`);
+                    const badge = document.getElementById(`badge-${video.id}`);
+                    if (pill) {
+                        const img = pill.querySelector('.reelify-card-p-img');
+                        img.style.backgroundImage = `url(${p.featured_image})`;
+                        img.style.backgroundSize = 'cover';
+                        pill.querySelector('.reelify-card-p-name').textContent = p.title;
+                        
+                        const curPrice = p.price;
+                        const compPrice = p.compare_at_price;
+                        
+                        pill.querySelector('.reelify-card-p-price').textContent = Shopify.formatMoney(curPrice, "{{ shop.money_format }}");
+                        
+                        if (compPrice && compPrice > curPrice) {
+                            const discount = Math.round(((compPrice - curPrice) / compPrice) * 100);
+                            if (discount > 5) {
+                                badge.textContent = `-${discount}% OFF`;
+                                badge.style.display = 'block';
+                            }
+                        }
+                    }
+                });
+            }
         });
     }
 
-    function openModal(video) {
-        modal.style.display = "block";
-        videoPlayer.src = video.url;
-        videoPlayer.play();
+    window.openReel = (index) => {
+        currentIndex = index;
+        const video = currentVideos[index];
+        modal.style.display = "flex";
+        player.src = (video.absEnabled && video.absUrl) ? video.absUrl : video.url;
+        player.load();
+        player.play();
 
-        // Show product if tagged
-        if (video.products && video.products.length > 0) {
-            const tag = video.products[0]; // Just showing first one for MVP
-            if (tag.handle) {
-                fetch(`/products/${tag.handle}.js`)
-                    .then(res => res.json())
-                    .then(product => {
-                         showProductOverlay(product, tag.variantId);
-                    });
-            }
-        } else {
-            productOverlay.style.display = "none";
+        loadProductSidebar(video.products?.[0]?.handle);
+    };
+
+    function loadProductSidebar(handle) {
+        if (!handle) {
+            sidebar.innerHTML = "<p>No products tagged in this video.</p>";
+            return;
         }
-    }
 
-    function showProductOverlay(product, variantId) {
-        productOverlay.style.display = "flex";
-        productOverlay.innerHTML = `
-            <img src="${product.featured_image}" width="50" height="50" style="border-radius:4px">
-            <div style="font-size:14px; font-weight:bold;">${product.title}</div>
-            <button class="reelify-btn-add" onclick="addToCart(${product.variants[0].id})">Add</button>
+        sidebar.innerHTML = `
+            <div class="reelify-pd-skeleton"><div class="sk-line large"></div><div class="sk-line small"></div><div class="sk-block"></div></div>
         `;
-        
-        window.addToCart = (vid) => {
-            fetch('/cart/add.js', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items: [{ id: vid, quantity: 1 }] })
-            })
-            .then(() => {
-                alert("Added to cart!");
-            });
-        };
+
+        fetch(`/products/${handle}.js`).then(r => r.json()).then(p => {
+            const price = Shopify.formatMoney(p.price, "{{ shop.money_format }}");
+            const hasCompare = p.compare_at_price && p.compare_at_price > p.price;
+            const compare = hasCompare ? Shopify.formatMoney(p.compare_at_price, "{{ shop.money_format }}") : '';
+
+            sidebar.innerHTML = `
+                <h1 class="r-pd-title">${p.title}</h1>
+                <div class="r-pd-price-row">
+                    <span class="r-pd-price">${price}</span>
+                    ${hasCompare ? `<span class="r-pd-compare">${compare}</span>` : ''}
+                </div>
+                <div class="r-pd-desc">${p.description.substring(0, 300)}...</div>
+                
+                <div style="margin-top:auto">
+                    <button class="r-pd-atc" onclick="rAddToCart('${p.variants[0].id}')">Add to Cart</button>
+                    <a href="${p.url}" style="display:block; text-align:center; margin-top:15px; color:#666; font-size:13px; text-decoration:none;">View Full Details</a>
+                </div>
+            `;
+        });
     }
 
-    closeBtn.onclick = function() {
+    window.rAddToCart = (id) => {
+        const btn = document.querySelector('.r-pd-atc');
+        btn.textContent = "Adding...";
+        fetch('/cart/add.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: [{ id: id, quantity: 1 }] })
+        }).then(() => {
+            btn.textContent = "Added! ✨";
+            setTimeout(() => btn.textContent = "Add to Cart", 2000);
+            if (window.Shopify?.onCartUpdate) window.Shopify.onCartUpdate(); 
+        });
+    };
+
+    // NAVIGATION
+    document.querySelector('.reelify-nav-arrow.next').onclick = () => {
+        currentIndex = (currentIndex + 1) % currentVideos.length;
+        openReel(currentIndex);
+    };
+    document.querySelector('.reelify-nav-arrow.prev').onclick = () => {
+        currentIndex = (currentIndex - 1 + currentVideos.length) % currentVideos.length;
+        openReel(currentIndex);
+    };
+
+    closeBtn.onclick = () => {
         modal.style.display = "none";
-        videoPlayer.pause();
-    }
-    
-    window.onclick = function(event) {
-        if (event.target == modal) {
-            modal.style.display = "none";
-            videoPlayer.pause();
-        }
-    }
+        player.pause();
+    };
+
+    window.onclick = (e) => {
+      if (e.target == modal || e.target.classList.contains('reelify-modal-backdrop')) {
+        modal.style.display = "none";
+        player.pause();
+      }
+    };
 });
 </script>
